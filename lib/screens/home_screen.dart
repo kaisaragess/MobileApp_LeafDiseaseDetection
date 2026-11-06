@@ -1,11 +1,18 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
+import '../models/history_entry.dart';
 import '../models/predict_settings.dart';
 import '../models/rice_disease_model.dart';
 import '../services/api_service.dart';
+import '../services/history_service.dart';
+import '../services/upload_validator.dart';
 import '../theme.dart';
 import '../widgets/app_logo.dart';
+import '../widgets/photo_guide.dart';
+import 'comparison_screen.dart';
 import 'result_screen.dart';
 import 'settings_screen.dart';
 
@@ -31,6 +38,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _checkServer();
   }
 
+  // Skor bisa 0-1 atau 0-100. Normalisasi ke persen.
+  double _pct(double v) => v.abs() <= 1.0 ? v * 100 : v;
+
   Future<void> _checkServer() async {
     setState(() => _serverOk = null);
     final ok = await _api.checkHealth();
@@ -41,7 +51,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _pick(ImageSource source) async {
     final picked = await _picker.pickImage(source: source, imageQuality: 90);
     if (picked == null) return;
-    setState(() => _image = File(picked.path));
+    final file = File(picked.path);
+    final error = await UploadValidator.validate(file);
+    if (!mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    setState(() => _image = file);
   }
 
   Future<void> _openSettings() async {
@@ -52,19 +70,45 @@ class _HomeScreenState extends State<HomeScreen> {
     if (result != null) setState(() => _settings = result);
   }
 
+  Future<void> _saveToHistory(File image, PredictResponse r) async {
+    try {
+      final id = DateTime.now().millisecondsSinceEpoch.toString();
+      final path = await HistoryService.saveImageCopy(image, id);
+      final probs = r.prediction.probabilities.map(
+        (k, v) => MapEntry(k, _pct(v)),
+      );
+      await HistoryService.add(
+        HistoryEntry(
+          id: id,
+          createdAt: DateTime.now(),
+          predictedClass: r.prediction.predictedClass,
+          confidencePct: _pct(r.prediction.confidenceScore),
+          pipeline: r.meta.pipelineUsed,
+          classifier: r.meta.classifierUsed,
+          probabilitiesPct: probs,
+          imagePath: path,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Gagal menyimpan riwayat: $e');
+    }
+  }
+
   Future<void> _diagnose() async {
-    if (_image == null) return;
+    final image = _image;
+    if (image == null) return;
     setState(() => _loading = true);
     try {
       final result = await _api.predictLeafDisease(
-        imageFile: _image!,
+        imageFile: image,
         settings: _settings,
       );
+      await _saveToHistory(image, result);
       if (!mounted) return;
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ResultScreen(image: _image!, result: result),
+          builder: (_) => ResultScreen(image: image, result: result),
         ),
       );
     } on NonLeafException catch (e) {
@@ -88,13 +132,29 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     } catch (e) {
+      // Detail teknis hanya ke log, pengguna melihat pesan umum.
+      debugPrint('Diagnosis gagal: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Terjadi kesalahan: $e')),
+        const SnackBar(
+          content: Text(
+            'Gagal menghubungi server. Periksa koneksi lalu coba lagi.',
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _openComparison(File image) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            ComparisonScreen(image: image, classifier: _settings.classifier),
+      ),
+    );
   }
 
   Widget _statusChip() {
@@ -171,10 +231,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final busy = _loading;
+    final hasImage = _image != null;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('LeafScan'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Panduan foto',
+            onPressed: () => showPhotoGuide(context),
+          ),
           IconButton(
             icon: const Icon(Icons.tune),
             tooltip: 'Pengaturan',
@@ -194,9 +262,9 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(16),
               child: AspectRatio(
                 aspectRatio: 4 / 3,
-                child: _image == null
-                    ? _placeholder()
-                    : Image.file(_image!, fit: BoxFit.cover),
+                child: hasImage
+                    ? Image.file(_image!, fit: BoxFit.cover)
+                    : _placeholder(),
               ),
             ),
             const SizedBox(height: 16),
@@ -204,8 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed:
-                        _loading ? null : () => _pick(ImageSource.camera),
+                    onPressed: busy ? null : () => _pick(ImageSource.camera),
                     icon: const Icon(Icons.camera_alt),
                     label: const Text('Kamera'),
                   ),
@@ -213,8 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed:
-                        _loading ? null : () => _pick(ImageSource.gallery),
+                    onPressed: busy ? null : () => _pick(ImageSource.gallery),
                     icon: const Icon(Icons.photo_library),
                     label: const Text('Galeri'),
                   ),
@@ -223,8 +289,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: (_image == null || _loading) ? null : _diagnose,
-              icon: _loading
+              onPressed: (!hasImage || busy) ? null : _diagnose,
+              icon: busy
                   ? const SizedBox(
                       width: 18,
                       height: 18,
@@ -234,7 +300,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     )
                   : const Icon(Icons.search),
-              label: Text(_loading ? 'Menganalisis...' : 'Diagnosis'),
+              label: Text(busy ? 'Menganalisis...' : 'Diagnosis'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: (!hasImage || busy)
+                  ? null
+                  : () => _openComparison(_image!),
+              icon: const Icon(Icons.compare_arrows),
+              label: const Text('Bandingkan 4 Pipeline'),
             ),
             const SizedBox(height: 16),
             SectionCard(
