@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
+import 'theme.dart';
 
 void main() => runApp(const LeafDiseaseApp());
 
@@ -9,12 +10,9 @@ class LeafDiseaseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Deteksi Penyakit Daun Padi',
+      title: 'LeafScan',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: Colors.green,
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light(),
       home: const HomeScreen(),
     );
   }
