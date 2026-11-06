@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_shell.dart';
 import 'theme.dart';
 
 void main() => runApp(const LeafDiseaseApp());
@@ -13,7 +13,7 @@ class LeafDiseaseApp extends StatelessWidget {
       title: 'LeafScan',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      home: const HomeScreen(),
+      home: const MainShell(),
     );
   }
 }

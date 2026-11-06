@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/rice_disease_model.dart';
 import '../theme.dart';
 import '../widgets/base64_image.dart';
+import '../widgets/disease_info_card.dart';
 
 class ResultScreen extends StatelessWidget {
   final File image;
@@ -121,11 +122,11 @@ class ResultScreen extends StatelessWidget {
                         itemBuilder: (_, i) {
                           final s = stages[i];
                           return SizedBox(
-                            width: 200,
+                            width: 260,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                buildBase64Image(s.value, height: 130),
+                                buildBase64Image(s.value, width: 260),
                                 const SizedBox(height: 6),
                                 Text(
                                   _stageTitles[s.key] ?? s.key,
@@ -148,6 +149,10 @@ class ResultScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
             ],
+
+            // Keterangan dan saran penanganan
+            DiseaseInfoCard(label: pred.predictedClass),
+            const SizedBox(height: 16),
 
             // Info proses
             SectionCard(
