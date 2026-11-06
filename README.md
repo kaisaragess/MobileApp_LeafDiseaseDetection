@@ -82,6 +82,8 @@ Baca [CONTRIBUTING.md](CONTRIBUTING.md) sebelum membuat perubahan. Jangan commit
 
 - kaisaragess: backend API
 - RanggaDT: frontend Flutter
+- Ilham : PPT
+- Raja : Jurnal
 
 ## Lisensi
 
