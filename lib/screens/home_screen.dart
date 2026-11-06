@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import '../models/predict_settings.dart';
 import '../models/rice_disease_model.dart';
 import '../services/api_service.dart';
+import '../theme.dart';
+import '../widgets/app_logo.dart';
 import 'result_screen.dart';
 import 'settings_screen.dart';
 
@@ -70,6 +72,11 @@ class _HomeScreenState extends State<HomeScreen> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
+          icon: const Icon(
+            Icons.eco_outlined,
+            color: AppColors.primary,
+            size: 36,
+          ),
           title: const Text('Objek Bukan Daun Padi'),
           content: Text(e.message),
           actions: [
@@ -95,22 +102,70 @@ class _HomeScreenState extends State<HomeScreen> {
     final String label;
     final IconData icon;
     if (_serverOk == null) {
-      color = Colors.orange;
+      color = Colors.orange.shade800;
       label = 'Mengecek server...';
       icon = Icons.sync;
     } else if (_serverOk!) {
-      color = Colors.green;
+      color = AppColors.primary;
       label = 'Server terhubung';
       icon = Icons.check_circle;
     } else {
-      color = Colors.red;
-      label = 'Server tidak terjangkau (ketuk untuk coba lagi)';
+      color = Colors.red.shade700;
+      label = 'Server tidak terjangkau. Ketuk untuk coba lagi';
       icon = Icons.error;
     }
-    return ActionChip(
-      avatar: Icon(icon, size: 18, color: color),
-      label: Text(label),
-      onPressed: _checkServer,
+    return Material(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: _checkServer,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return Container(
+      color: AppColors.primary.withValues(alpha: 0.08),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.eco, size: 56, color: AppColors.primary),
+          SizedBox(height: 8),
+          Text(
+            'Belum ada foto daun',
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: 2),
+          Text(
+            'Ambil foto atau pilih dari galeri',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          ),
+        ],
+      ),
     );
   }
 
@@ -118,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Deteksi Penyakit Daun Padi'),
+        title: const Text('LeafScan'),
         actions: [
           IconButton(
             icon: const Icon(Icons.tune),
@@ -131,27 +186,16 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Align(alignment: Alignment.centerLeft, child: _statusChip()),
-            const SizedBox(height: 16),
-            AspectRatio(
-              aspectRatio: 4 / 3,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                clipBehavior: Clip.antiAlias,
+            const Center(child: AppLogo(height: 110)),
+            const SizedBox(height: 8),
+            Center(child: _statusChip()),
+            const SizedBox(height: 20),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: AspectRatio(
+                aspectRatio: 4 / 3,
                 child: _image == null
-                    ? const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.eco, size: 48, color: Colors.grey),
-                            SizedBox(height: 8),
-                            Text('Belum ada foto daun'),
-                          ],
-                        ),
-                      )
+                    ? _placeholder()
                     : Image.file(_image!, fit: BoxFit.cover),
               ),
             ),
@@ -160,7 +204,8 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _loading ? null : () => _pick(ImageSource.camera),
+                    onPressed:
+                        _loading ? null : () => _pick(ImageSource.camera),
                     icon: const Icon(Icons.camera_alt),
                     label: const Text('Kamera'),
                   ),
@@ -183,16 +228,52 @@ class _HomeScreenState extends State<HomeScreen> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Icon(Icons.search),
               label: Text(_loading ? 'Menganalisis...' : 'Diagnosis'),
             ),
             const SizedBox(height: 16),
-            Text(
-              'Pipeline ${_settings.pipelineMode} | Model ${_settings.classifier}',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
+            SectionCard(
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.tune, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Pengaturan analisis',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Pipeline ${_settings.pipelineMode} | Model ${_settings.classifier}',
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _openSettings,
+                    child: const Text('Ubah'),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
